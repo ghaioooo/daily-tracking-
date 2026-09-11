@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>متابعتي اليومية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e1a30">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3652/3652191.png">
+
+<!-- 1. مكتبة Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --bg-deep:#0e1a30;
+    --bg-mid:#152945;
+    --gold:#d9ad5c;
+    --teal:#4fb0a0;
+    --alert:#e2725b;
+    --good:#7fae82;
+    --ink:#f4efe2;
+    --ink-dim:#b9c2d4;
+    --glass:rgba(255,255,255,0.055);
+    --glass-strong:rgba(255,255,255,0.09);
+    --line:rgba(255,255,255,0.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:'Tajawal',sans-serif;
+    color:var(--ink);
+    background:var(--bg-deep);
+    overflow-x:hidden;
+    min-height:100vh;
+  }
+  .aurora{
+    position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none;
+    background:
+      radial-gradient(ellipse at 15% 15%, rgba(79,176,160,.16), transparent 38%),
+      radial-gradient(ellipse at 88% 82%, rgba(217,173,92,.12), transparent 34%),
+      linear-gradient(135deg,#0a1428 0%,var(--bg-deep) 48%,#10233d 100%);
+  }
+  .aurora::before{
+    content:'';
+    position:absolute;
+    inset:-30%;
+    opacity:.16;
+    background-image:
+      linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px);
+    background-size:56px 56px;
+    transform:rotate(-8deg);
+    animation:grid-drift 26s linear infinite;
+  }
+  .aurora::after{
+    content:'';
+    position:absolute;
+    inset:-35%;
+    background:conic-gradient(from 210deg at 50% 50%, transparent 0deg, rgba(79,176,160,.08) 80deg, transparent 150deg, rgba(217,173,92,.06) 235deg, transparent 310deg);
+    animation:light-sweep 32s ease-in-out infinite alternate;
+  }
+  .aurora span{
+    position:absolute; border-radius:50%; filter:blur(70px); opacity:.22;
+    animation:drift 34s ease-in-out infinite;
+  }
+  .aurora span:nth-child(1){width:58vw;height:18vh;background:var(--teal);top:4%;right:-18%;transform:rotate(-18deg);animation-duration:38s;}
+  .aurora span:nth-child(2){width:52vw;height:16vh;background:var(--gold);bottom:0;left:-18%;transform:rotate(16deg);animation-duration:44s;animation-delay:-6s;}
+  .aurora span:nth-child(3){width:42vw;height:12vh;background:#5c6fd0;top:48%;left:32%;transform:rotate(-8deg);animation-duration:50s;animation-delay:-14s;opacity:.14;}
+  @keyframes grid-drift{
+    from{background-position:0 0;}
+    to{background-position:56px 56px;}
+  }
+  @keyframes light-sweep{
+    from{transform:translate3d(-5%, -2%, 0) rotate(0deg);}
+    to{transform:translate3d(5%, 2%, 0) rotate(18deg);}
+  }
+  @keyframes drift{
+    0%{transform:translate(0,0) scale(1);}
+    33%{transform:translate(30px,-40px) scale(1.08);}
+    66%{transform:translate(-25px,25px) scale(0.95);}
+    100%{transform:translate(0,0) scale(1);}
+  }
+  .wrap{position:relative; z-index:1; max-width:880px; margin:0 auto; padding:28px 18px 60px;}
+  .top{display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:6px;}
+  .profile{display:flex;align-items:center;gap:10px;min-width:0;}
+  .profile-avatar{width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);background:var(--glass-strong);flex:0 0 54px;}
+  .profile-copy{min-width:0;}
+  .profile-name{font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+  .profile-link{border:0;background:transparent;color:var(--gold);font:inherit;font-size:11px;padding:2px 0;cursor:pointer;}
+  .top-actions{display:flex; align-items:center; gap:8px;}
+  .top-actions button{background:var(--glass); border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:8px 10px; cursor:pointer; font:inherit; font-size:12px;}
+  h1{font-family:'Cairo',sans-serif; font-weight:800; font-size:22px; margin:0; letter-spacing:.3px;}
+  .tagline{color:var(--ink-dim); font-size:13px; margin:4px 0 22px;}
+  .nav{display:flex; align-items:center; gap:14px; background:var(--glass); border:1px solid var(--line); border-radius:14px; padding:8px 10px;}
+  .nav button{
+    background:var(--glass-strong); border:1px solid var(--line); color:var(--ink);
+    width:34px; height:34px; border-radius:10px; cursor:pointer; font-size:16px;
+  }
+  .nav .month-label{font-family:'Cairo',sans-serif; font-weight:700; font-size:15px; min-width:120px; text-align:center;}
+
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:20px 0 22px;}
+  .stat{
+    background:var(--glass); border:1px solid var(--line); border-radius:14px;
+    padding:12px 10px; text-align:center;
+  }
+  .stat .icon{font-size:18px;}
+  .stat .val{font-family:'Cairo',sans-serif; font-weight:700; font-size:16px; margin-top:4px;}
+  .stat .lbl{color:var(--ink-dim); font-size:11px; margin-top:2px;}
+  .feature-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 0 22px;}
+  .feature-card{display:flex;align-items:center;gap:12px;text-align:right;background:linear-gradient(135deg,rgba(79,176,160,.16),rgba(255,255,255,.05));border:1px solid var(--line);border-radius:14px;padding:13px;cursor:pointer;color:var(--ink);font:inherit;transition:transform .12s ease,border-color .12s ease;}
+  .feature-card:hover{transform:translateY(-2px);border-color:rgba(217,173,92,.65);}
+  .feature-card .feature-icon{font-size:25px;line-height:1;}
+  .feature-card strong{display:block;font-family:'Cairo',sans-serif;font-size:14px;}
+  .feature-card span{display:block;color:var(--ink-dim);font-size:11px;margin-top:3px;}
+
+  .weekdays{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px;}
+  .weekdays div{text-align:center; font-size:11px; color:var(--ink-dim); padding:4px 0;}
+
+  .grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+  .cell{
+    aspect-ratio:1/1; border-radius:12px; background:var(--glass); border:1px solid var(--line);
+    padding:6px; display:flex; flex-direction:column; justify-content:space-between; cursor:pointer;
+    transition:transform .12s ease, background .12s ease;
+    position:relative;
+  }
+  .cell:hover{background:var(--glass-strong); transform:translateY(-2px);}
+  .cell.locked{cursor:default;}
+  .cell.locked:hover{transform:none;}
+  .cell.future{opacity:.58;}
+  .cell.empty{background:transparent; border:none; cursor:default;}
+  .cell.empty:hover{transform:none;}
+  .cell .num{font-family:'Cairo',sans-serif; font-weight:700; font-size:13px;}
+  .cell .icons{font-size:11px; letter-spacing:1px; line-height:1;}
+  .cell .delta{font-size:10px; color:var(--ink-dim);}
+  .cell .delta.up{color:var(--alert);}
+  .cell .delta.down{color:var(--good);}
+  .cell .badge{
+    position:absolute; top:-5px; left:-5px; background:var(--alert); color:#fff;
+    font-size:10px; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  }
+  .cell.today{
+    outline:none;
+    z-index:0;
+  }
+  .cell.today::before{
+    content:'';
+    position:absolute;
+    inset:-2px;
+    border-radius:14px;
+    padding:2px;
+    background:conic-gradient(from var(--today-ring-angle,0deg), transparent 0%, transparent 28%, var(--gold) 44%, #fff 50%, var(--teal) 56%, transparent 72%, transparent 100%);
+    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor;
+    mask-composite:exclude;
+    animation:today-ring-spin 2.8s linear infinite;
+    pointer-events:none;
+    z-index:2;
+  }
+  @property --today-ring-angle{
+    syntax:'<angle>';
+    initial-value:0deg;
+    inherits:false;
+  }
+  @keyframes today-ring-spin{
+    to{--today-ring-angle:360deg;}
+  }
+
+  .legend{margin-top:18px; font-size:11px; color:var(--ink-dim); display:flex; flex-wrap:wrap; gap:12px;}
+
+  .backdrop{
+    position:fixed; inset:0; background:rgba(6,10,20,.55); backdrop-filter:blur(3px);
+    display:none; align-items:center; justify-content:center; z-index:10; padding:16px;
+  }
+  .backdrop.open{display:flex;}
+  .modal{
+    background:var(--bg-mid); border:1px solid var(--line); border-radius:18px;
+    max-width:420px; width:100%; max-height:88vh; overflow-y:auto; padding:22px 22px 18px;
+  }
+  .modal h2{font-family:'Cairo',sans-serif; font-size:17px; margin:0 0 4px;}
+  .modal .sub{color:var(--ink-dim); font-size:12px; margin-bottom:16px;}
+  .field{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--glass); border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px; margin-bottom:9px;
+  }
+  .field .flabel{font-size:13.5px; display:flex; align-items:center; gap:6px;}
+  .toggle{display:flex; gap:6px;}
+  .toggle button{
+    border:1px solid var(--line); background:transparent; color:var(--ink-dim);
+    border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .toggle button.active{background:var(--good); color:#0e1a30; border-color:var(--good); font-weight:700;}
+  .toggle button.active.no{background:var(--alert); border-color:var(--alert); color:#fff;}
+  .num-field input{
+    width:64px; background:var(--glass-strong); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:5px 8px; text-align:center; font-family:inherit; font-size:13px;
+  }
+  .rating{display:flex; gap:5px;}
+  .rating button{
+    width:28px; height:28px; border-radius:50%; border:1px solid var(--line); background:transparent;
+    color:var(--ink-dim); font-size:12px; cursor:pointer;
+  }
+  .rating button.active{background:var(--gold); color:#0e1a30; border-color:var(--gold); font-weight:700;}
+  textarea{
+    width:100%; background:var(--glass); border:1px solid var(--line); color:var(--ink);
+    border-radius:10px; padding:10px; font-family:inherit; font-size:13px; resize:vertical; min-height:60px; margin-bottom:10px;
+  }
+  .alertbox{
+    background:rgba(226,114,91,.14); border:1px solid rgba(226,114,91,.4); color:#f3b7a7;
+    border-radius:10px; padding:8px 10px; font-size:12px; margin-bottom:10px;
+  }
+  .actions{display:flex; gap:8px; margin-top:6px;}
+  .actions button{
+    flex:1; padding:10px; border-radius:10px; border:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:700;
+  }
+  .save{background:var(--gold); color:#0e1a30;}
+  .close{background:var(--glass-strong); color:var(--ink); border:1px solid var(--line) !important;}
+  .note-msg{font-size:11px; color:var(--ink-dim); text-align:center; margin-top:14px;}
+  .profile-modal{max-width:390px;}
+  .avatar-preview{display:block;width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--gold);margin:4px auto 16px;background:var(--glass-strong);}
+  .report-modal,.chart-modal{max-width:680px;}
+  .report-list{display:grid;gap:8px;max-height:58vh;overflow-y:auto;}
+  .report-row{display:grid;grid-template-columns:100px 1fr auto;gap:10px;align-items:center;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;}
+  .report-date{font-family:'Cairo',sans-serif;font-weight:700;color:var(--gold);}
+  .report-values{color:var(--ink-dim);line-height:1.7;}
+  .report-edit{background:var(--glass-strong);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 9px;cursor:pointer;font:inherit;font-size:11px;}
+  .chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+  .chart-box{background:var(--glass);border:1px solid var(--line);border-radius:12px;padding:12px;}
+  .chart-title{font-family:'Cairo',sans-serif;font-size:13px;margin-bottom:10px;}
+  .chart-bars{height:155px;display:flex;align-items:end;gap:4px;border-bottom:1px solid var(--line);padding:0 2px;}
+  .chart-bar{flex:1;min-width:3px;background:linear-gradient(to top,var(--teal),var(--gold));border-radius:4px 4px 0 0;position:relative;min-height:3px;}
+  .chart-bar span{position:absolute;bottom:100%;right:50%;transform:translateX(50%);font-size:8px;color:var(--ink-dim);white-space:nowrap;margin-bottom:3px;}
+  .chart-labels{display:flex;gap:4px;margin-top:5px;color:var(--ink-dim);font-size:8px;}
+  .chart-labels span{flex:1;text-align:center;overflow:hidden;}
+  .modal.read-only .field,
+  .modal.read-only textarea{opacity:.78;}
+  .modal.read-only .toggle button,
+  .modal.read-only input,
+  .modal.read-only textarea,
+  .modal.read-only .rating button{cursor:not-allowed;}
+  .status-msg{min-height:18px; color:var(--ink-dim); font-size:12px; text-align:center; margin:10px 0 2px;}
+  .status-msg.error{color:#f3b7a7;}
+  button:disabled{opacity:.55; cursor:wait;}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.01ms !important; transition-duration:.01ms !important;}
+  }
+
+  /* تنسيقات نافذة تسجيل الدخول والإعدادات */
+  .auth-input {
+    width: 100%;
+    background: var(--glass-strong);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    margin-bottom: 10px;
+    outline: none;
+  }
+  .auth-input:focus { border-color: var(--gold); }
+  .settings-modal{max-width:520px;}
+  .activity-options{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;}
+  .activity-option{display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;}
+  .activity-option input{accent-color:var(--gold);width:17px;height:17px;}
+  .custom-activity-form{display:grid;grid-template-columns:1fr 76px 100px auto;gap:7px;align-items:end;margin:8px 0 12px;}
+  .custom-activity-form label{color:var(--ink-dim);font-size:10px;}
+  .custom-activity-form input,.custom-activity-form select{width:100%;margin-top:4px;}
+  .custom-activity-add{height:39px;background:var(--teal);color:#0e1a30;border:0;border-radius:8px;padding:0 10px;cursor:pointer;font:inherit;font-size:12px;font-weight:700;}
+  .custom-activity-list{display:grid;gap:6px;margin-bottom:12px;}
+  .custom-activity-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--glass);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12px;}
+  .custom-activity-row small{color:var(--ink-dim);}
+  .custom-activity-delete{background:transparent;color:#f3b7a7;border:1px solid rgba(226,114,91,.4);border-radius:7px;padding:4px 7px;cursor:pointer;font:inherit;font-size:10px;}
+  .custom-fields{margin-top:4px;}
+  .custom-field-input{width:72px;background:var(--glass-strong);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 7px;font:inherit;text-align:center;}
+  .custom-field-input.text{width:130px;text-align:right;}
+  [data-activity].activity-hidden{display:none;}
+  @media(max-width:600px){
+    .wrap{padding:18px 10px 38px;}
+    .top{flex-direction:column;align-items:stretch;gap:14px;margin-bottom:14px;}
+    .profile{justify-content:center;}
+    .profile-name{max-width:145px;}
+    .top>div:nth-child(2){text-align:center;}
+    h1{font-size:20px;}
+    .tagline{font-size:11px;margin:3px 0 0;white-space:nowrap;}
+    .top-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+    .top-actions button{min-height:38px;padding:7px 5px;font-size:11px;}
+    .nav{gap:8px;padding:7px;}
+    .nav .month-label{min-width:0;flex:1;font-size:14px;}
+    .nav button{flex:0 0 34px;}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:14px 0 16px;}
+    .stat{padding:9px 5px;border-radius:11px;min-width:0;}
+    .stat .val{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .stat .lbl{font-size:10px;line-height:1.3;}
+    .feature-cards{gap:7px;margin-bottom:16px;}
+    .feature-card{padding:10px 8px;gap:7px;}
+    .feature-card .feature-icon{font-size:21px;}
+    .feature-card strong{font-size:12px;}
+    .feature-card span{font-size:9px;}
+    .weekdays,.grid{gap:3px;}
+    .weekdays div{font-size:10px;padding:3px 0;}
+    .cell{border-radius:8px;padding:4px;}
+    .cell .num{font-size:11px;}
+    .cell .icons{font-size:8px;letter-spacing:0;white-space:normal;overflow:hidden;line-height:1.15;}
+    .cell .delta{font-size:8px;white-space:nowrap;}
+    .cell .badge{top:-3px;left:-3px;width:14px;height:14px;font-size:9px;}
+    .legend{margin-top:13px;gap:7px;font-size:10px;justify-content:center;}
+    .backdrop{padding:8px;align-items:flex-end;}
+    .modal{max-height:92vh;border-radius:16px 16px 0 0;padding:18px 14px 14px;}
+    .modal h2{font-size:16px;}
+    .modal .sub{font-size:11px;margin-bottom:12px;}
+    .field{gap:8px;align-items:flex-start;padding:9px 10px;}
+    .field .flabel{font-size:12px;line-height:1.5;flex:1;min-width:0;}
+    .toggle{flex:0 0 auto;}
+    .toggle button{padding:5px 8px;font-size:11px;}
+    .rating{flex:0 0 auto;gap:3px;}
+    .rating button{width:26px;height:26px;font-size:11px;}
+    .num-field input{width:70px;flex:0 0 70px;}
+    .actions{gap:6px;}
+    .actions button{padding:9px 6px;font-size:12px;}
+    .activity-options{grid-template-columns:1fr;gap:6px;}
+    .activity-option{padding:9px;font-size:12px;}
+    .custom-activity-form{grid-template-columns:1fr 62px;}
+    .custom-activity-form label:nth-child(3){grid-column:1;}
+    .custom-activity-add{grid-column:2;grid-row:2;height:36px;}
+    .custom-field-input.text{width:105px;}
+    .report-row{grid-template-columns:1fr auto;gap:5px;}
+    .report-values{grid-column:1/-1;}
+    .chart-grid{grid-template-columns:1fr;gap:9px;}
+    .chart-bars{height:130px;}
+  }
+  @media(max-width:360px){
+    .tagline{font-size:10px;}
+    .cell .icons{font-size:7px;}
+    .field .flabel{font-size:11px;}
+    .toggle button{padding-inline:6px;}
+  }
+</style>
+</head>
+<body>
+  <div class="aurora"><span></span><span></span><span></span></div>
+  <div class="wrap">
+    <div class="top">
+      <div class="profile">
+        <img id="profileAvatar" class="profile-avatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="صورة المستخدم">
+        <div class="profile-copy">
+          <div id="profileName" class="profile-name">مرحبًا بك</div>
+          <button id="changeAvatarBtn" class="profile-link" type="button">تغيير الصورة</button>
+        </div>
+      </div>
+      <div>
+        <h1>🌙 متابعتي اليومية</h1>
+        <div class="tagline">الصلاة، الغذاء، الرياضة، النوم والوزن — في مكان واحد</div>
+      </div>
+      <div class="top-actions">
+        <button id="settingsBtn" type="button">⚙️ الأنشطة</button>
+        <button id="logoutBtn" type="button">تسجيل الخروج</button>
+      </div>
+    </div>
+
+    <div class="nav">
+      <button id="prevBtn" type="button" aria-label="الشهر السابق">‹</button>
+      <div class="month-label" id="monthLabel"></div>
+      <button id="nextBtn" type="button" aria-label="الشهر التالي">›</button>
+    </div>
+    <div class="status-msg" id="statusMsg" role="status" aria-live="polite"></div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="feature-cards">
+      <button class="feature-card" id="reportsBtn" type="button">
+        <span class="feature-icon">📚</span>
+        <span><strong>التقارير</strong><span>شاهد نتائجك السابقة</span></span>
+      </button>
+      <button class="feature-card" id="chartsBtn" type="button">
+        <span class="feature-icon">📈</span>
+        <span><strong>الشارتات</strong><span>تابع التغيرات بصريًا</span></span>
+      </button>
+    </div>
+
+    <div class="weekdays">
+      <div>أحد</div><div>اثنين</div><div>ثلاثاء</div><div>أربعاء</div><div>خميس</div><div>جمعة</div><div>سبت</div>
+    </div>
+    <div class="grid" id="grid"></div>
+
+    <div class="legend">
+      <span>🕌 الصلوات</span><span>🥗 غذاء</span><span>🏃 رياضة</span><span>😊 رضا اليوم</span>
+      <span>😴 نوم</span><span>⚖️ وزن</span><span>⚠️ تنبيه</span>
+    </div>
+  </div>
+
+  <!-- نافذة تسجيل اليوم المنبثقة -->
+  <div class="backdrop" id="backdrop">
+    <div class="modal">
+      <h2 id="modalDate">—</h2>
+      <div class="sub">سجّل يومك بصدق، بدون ضغط 🌿</div>
+      <div id="alertsArea"></div>
+
+      <div class="field" data-activity="prayers"><span class="flabel">🕌 تقييم الصلاة (من 3)</span>
+        <div class="rating prayer-rating" data-key="prayers">
+          <button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button>
+        </div></div>
+      <div class="field" data-activity="diet"><span class="flabel">🥗 غذاء صحي</span>
+        <div class="toggle" data-key="diet"><button data-v="1">نعم</button><button data-v="0" class="no">لا</button></div></div>
+      <div class="field" data-activity="exercise"><span class="flabel">🏃 نشاط رياضي</span>
+        <div class="toggle" data-key="exercise"><button data-v="1">نعم</button><button data-v="0" class="no">لا</button></div></div>
+      <div class="field" data-activity="satisfied"><span class="flabel">😊 راضٍ عن يومك</span>
+        <div class="toggle" data-key="satisfied"><button data-v="1">نعم</button><button data-v="0" class="no">لا</button></div></div>
+
+      <div class="field num-field" data-activity="sleep"><span class="flabel">😴 ساعات النوم</span>
+        <input type="number" id="sleepInput" min="0" max="16" step="0.5"></div>
+      <div class="field num-field" data-activity="water"><span class="flabel">💧 أكواب الماء</span>
+        <input type="number" id="waterInput" min="0" max="20" step="1"></div>
+      <div class="field num-field" data-activity="weight"><span class="flabel">⚖️ الوزن (كغم)</span>
+        <input type="number" id="weightInput" min="0" max="300" step="0.1"></div>
+
+      <div class="field" data-activity="rating"><span class="flabel">⭐ تقييم رضاك عن نفسك</span>
+        <div class="rating" id="ratingArea"></div></div>
+
+      <div data-activity="notes">
+        <span class="flabel" style="display:block;margin:8px 0 6px;">📝 ملاحظات</span>
+        <textarea id="notesInput" placeholder="أي شيء تحب تسجّله عن يومك..."></textarea>
+      </div>
+      <div class="custom-fields" id="customFields"></div>
+
+      <div class="actions">
+        <button class="close" id="closeBtn">إغلاق</button>
+        <button class="save" id="saveBtn">حفظ اليوم</button>
+      </div>
+      <div class="note-msg" id="saveMsg"></div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="settingsBackdrop">
+    <div class="modal settings-modal">
+      <h2>⚙️ تخصيص الأنشطة</h2>
+      <div class="sub">اختر الأنشطة والنتائج التي تريد ظهورها في تقييمك اليومي.</div>
+      <div class="activity-options" id="activityOptions"></div>
+      <div class="flabel" style="display:block;margin:8px 0 6px;">أنشطتك الخاصة</div>
+      <div class="custom-activity-list" id="customActivityList"></div>
+      <div class="custom-activity-form">
+        <label>اسم النشاط<input id="customActivityName" class="auth-input" type="text" maxlength="30" placeholder="مثال: قراءة"></label>
+        <label>الرمز<input id="customActivityIcon" class="auth-input" type="text" maxlength="2" value="✨"></label>
+        <label>نوع النتيجة<select id="customActivityType" class="auth-input"><option value="toggle">نعم / لا</option><option value="number">رقم</option><option value="text">نص</option></select></label>
+        <button id="addCustomActivityBtn" class="custom-activity-add" type="button">إضافة</button>
+      </div>
+      <div class="actions">
+        <button class="close" id="settingsCloseBtn" type="button">إغلاق</button>
+        <button class="save" id="settingsSaveBtn" type="button">حفظ الاختيارات</button>
+      </div>
+      <div class="note-msg" id="settingsMsg"></div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="profileBackdrop">
+    <div class="modal profile-modal">
+      <h2>🖼️ صورة المستخدم</h2>
+      <div class="sub">اختر صورة من جهازك لتظهر في أعلى الصفحة.</div>
+      <img id="avatarPreview" class="avatar-preview" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="معاينة الصورة">
+      <input id="avatarInput" class="auth-input" type="file" accept="image/*">
+      <div class="actions">
+        <button class="close" id="profileCloseBtn" type="button">إغلاق</button>
+        <button class="save" id="profileSaveBtn" type="button">حفظ الصورة</button>
+      </div>
+      <div class="note-msg" id="profileMsg"></div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="reportsBackdrop">
+    <div class="modal report-modal">
+      <h2>📚 التقارير السابقة</h2>
+      <div class="sub">كل الأيام التي سجّلت لها تقييمًا، من الأحدث إلى الأقدم.</div>
+      <div class="report-list" id="reportList"></div>
+      <div class="actions"><button class="close" id="reportsCloseBtn" type="button">إغلاق</button></div>
+      <div class="note-msg" id="reportsMsg"></div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="chartsBackdrop">
+    <div class="modal chart-modal">
+      <h2>📈 الشارتات</h2>
+      <div class="sub">توضيح بصري للنوم والماء والرضا وتغير الوزن في سجلاتك.</div>
+      <div class="chart-grid" id="chartGrid"></div>
+      <div class="actions"><button class="close" id="chartsCloseBtn" type="button">إغلاق</button></div>
+      <div class="note-msg" id="chartsMsg"></div>
+    </div>
+  </div>
+
+  <!-- نافذة تسجيل الدخول المنبثقة -->
+  <div class="backdrop" id="authBackdrop">
+    <div class="modal">
+      <h2>🔐 تسجيل الدخول / حساب جديد</h2>
+      <div class="sub">سجّل ببريدك الإلكتروني للحفاظ على بياناتك ومزامنتها</div>
+      <input type="email" id="emailInput" class="auth-input" placeholder="البريد الإلكتروني">
+      <input type="password" id="passInput" class="auth-input" placeholder="كلمة المرور">
+      <div class="actions" style="margin-top:12px;">
+        <button class="close" id="doSignupBtn" type="button">إنشاء حساب</button>
+        <button class="save" id="doLoginBtn" type="button">تسجيل الدخول</button>
+      </div>
+      <div class="note-msg" id="authMsg"></div>
+    </div>
+  </div>
+
+<script>
+// --- 2. تهيئة Supabase بالمعلومات الخاصة بك ---
+const SUPABASE_URL = "https://fxmofnmziwqdfphhzpru.supabase.co";
+const SUPABASE_KEY = "sb_publishable_yY67TQTN-KWZI78V4PrUfA_XtUyfhJF";
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const ARABIC_MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const ACTIVITY_LABELS={
+  prayers:'🕌 تقييم الصلاة', diet:'🥗 غذاء صحي', exercise:'🏃 نشاط رياضي', satisfied:'😊 الرضا عن اليوم',
+  sleep:'😴 ساعات النوم', water:'💧 أكواب الماء', weight:'⚖️ الوزن', rating:'⭐ الرضا عن النفس', notes:'📝 الملاحظات'
+};
+const DEFAULT_ACTIVITIES=Object.keys(ACTIVITY_LABELS);
+const DEFAULT_AVATAR='https://cdn-icons-png.flaticon.com/512/149/149071.png';
+let today=new Date();
+let viewYear=today.getFullYear();
+let viewMonth=today.getMonth();
+let monthData={};
+let selectedDay=null;
+let currentUser=null;
+let selectedActivities=[...DEFAULT_ACTIVITIES];
+let customActivities=[];
+let customActivityEntries={};
+
+function dayKey(d){ return String(d).padStart(2,'0'); }
+
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>'"]/g, character=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
+  }[character]));
+}
+
+function applyUserProfile(){
+  const avatar=currentUser?.user_metadata?.avatar_url || DEFAULT_AVATAR;
+  const name=currentUser?.user_metadata?.display_name || currentUser?.email?.split('@')[0] || 'مرحبًا بك';
+  document.getElementById('profileAvatar').src=avatar;
+  document.getElementById('avatarPreview').src=avatar;
+  document.getElementById('profileName').textContent=name;
+}
+
+// --- 3. فحص المصادقة والدخول ---
+async function checkAuthStatus() {
+  const { data: { user } } = await _supabase.auth.getUser();
+  currentUser = user;
+
+  if (currentUser) {
+    document.getElementById('authBackdrop').classList.remove('open');
+    applyUserProfile();
+    loadActivityPreferences();
+    loadMonth();
+  } else {
+    document.getElementById('authBackdrop').classList.add('open');
+  }
+}
+
+document.getElementById('doLoginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passInput').value;
+  const msg = document.getElementById('authMsg');
+
+  if (!email || !password) {
+    msg.textContent = '⚠️ يرجى إدخال البريد وكلمة المرور';
+    return;
+  }
+
+  msg.textContent = 'جاري التحقق...';
+
+  let { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    msg.textContent = '❌ البريد أو كلمة المرور غير صحيحة';
+    return;
+  }
+
+  currentUser = data.user;
+  applyUserProfile();
+  msg.textContent = '✅ تم الدخول بنجاح!';
+  
+  setTimeout(() => {
+    document.getElementById('authBackdrop').classList.remove('open');
+    loadActivityPreferences();
+    loadMonth();
+  }, 800);
+});
+
+document.getElementById('doSignupBtn').addEventListener('click', async () => {
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passInput').value;
+  const msg = document.getElementById('authMsg');
+
+  if (!email || !password) {
+    msg.textContent = '⚠️ يرجى إدخال البريد وكلمة المرور';
+    return;
+  }
+
+  msg.textContent = 'جاري إنشاء الحساب...';
+  const { data, error } = await _supabase.auth.signUp({ email, password });
+  if (error) {
+    msg.textContent = '❌ تعذر إنشاء الحساب: ' + error.message;
+    return;
+  }
+  if (!data.session) {
+    msg.textContent = '✅ تم إنشاء الحساب. تحقق من بريدك لتفعيله.';
+    return;
+  }
+  currentUser = data.user;
+  applyUserProfile();
+  document.getElementById('authBackdrop').classList.remove('open');
+  loadActivityPreferences();
+  loadMonth();
+});
+
+function activityStorageKey(){ return `monthly-tracker-activities-${currentUser?.id || 'guest'}`; }
+function customStorageKey(){ return `monthly-tracker-custom-${currentUser?.id || 'guest'}`; }
+
+function loadActivityPreferences(){
+  try {
+    const saved=JSON.parse(localStorage.getItem(activityStorageKey()) || 'null');
+    selectedActivities=Array.isArray(saved) ? saved.filter(key=>ACTIVITY_LABELS[key]) : [...DEFAULT_ACTIVITIES];
+  } catch(error) {
+    selectedActivities=[...DEFAULT_ACTIVITIES];
+  }
+  loadCustomPreferences();
+  applyActivityPreferences();
+}
+
+function loadCustomPreferences(){
+  try {
+    const saved=JSON.parse(localStorage.getItem(customStorageKey()) || '{}');
+    customActivities=Array.isArray(saved.activities) ? saved.activities.filter(activity=>activity.id && activity.name) : [];
+    customActivityEntries=saved.entries && typeof saved.entries==='object' ? saved.entries : {};
+  } catch(error) {
+    customActivities=[];
+    customActivityEntries={};
+  }
+}
+
+function saveCustomPreferences(){
+  localStorage.setItem(customStorageKey(),JSON.stringify({activities:customActivities,entries:customActivityEntries}));
+}
+
+function currentDateKey(day){
+  return `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${dayKey(day)}`;
+}
+
+function renderCustomFields(entry){
+  const container=document.getElementById('customFields');
+  const values=customActivityEntries[currentDateKey(selectedDay)] || {};
+  container.innerHTML=customActivities.map(activity=>{
+    const value=values[activity.id] ?? '';
+    if(activity.type==='toggle') return `<div class="field" data-custom-field="${escapeHtml(activity.id)}"><span class="flabel">${escapeHtml(activity.icon)} ${escapeHtml(activity.name)}</span><div class="toggle custom-toggle"><button data-v="1" class="${String(value)==='1'?'active':''}">نعم</button><button data-v="0" class="no ${String(value)==='0'?'active':''}">لا</button></div></div>`;
+    const inputType=activity.type==='number'?'number':'text';
+    return `<div class="field" data-custom-field="${escapeHtml(activity.id)}"><span class="flabel">${escapeHtml(activity.icon)} ${escapeHtml(activity.name)}</span><input class="custom-field-input ${inputType==='text'?'text':''}" type="${inputType}" value="${escapeHtml(value)}" ${inputType==='number'?'step="any"':''}></div>`;
+  }).join('');
+  container.querySelectorAll('.custom-toggle button').forEach(button=>button.addEventListener('click',()=>{
+    button.parentElement.querySelectorAll('button').forEach(item=>item.classList.remove('active'));
+    button.classList.add('active');
+  }));
+}
+
+function collectCustomValues(){
+  const values={};
+  document.querySelectorAll('[data-custom-field]').forEach(field=>{
+    const id=field.dataset.customField;
+    const active=field.querySelector('.custom-toggle button.active');
+    const input=field.querySelector('.custom-field-input');
+    values[id]=active ? active.dataset.v : input.value;
+  });
+  return values;
+}
+
+function applyActivityPreferences(){
+  document.querySelectorAll('[data-activity]').forEach(element=>{
+    element.classList.toggle('activity-hidden', !selectedActivities.includes(element.dataset.activity));
+  });
+}
+
+function openSettings(){
+  const options=document.getElementById('activityOptions');
+  options.innerHTML=Object.entries(ACTIVITY_LABELS).map(([key,label])=>
+    `<label class="activity-option"><input type="checkbox" value="${key}" ${selectedActivities.includes(key)?'checked':''}>${label}</label>`
+  ).join('');
+  renderCustomActivitySettings();
+  document.getElementById('settingsMsg').textContent='';
+  document.getElementById('settingsBackdrop').classList.add('open');
+}
+
+document.getElementById('settingsBtn').addEventListener('click',openSettings);
+document.getElementById('settingsCloseBtn').addEventListener('click',()=>document.getElementById('settingsBackdrop').classList.remove('open'));
+document.getElementById('settingsSaveBtn').addEventListener('click',()=>{
+  const checked=[...document.querySelectorAll('#activityOptions input:checked')].map(input=>input.value);
+  if(!checked.length){
+    document.getElementById('settingsMsg').textContent='اختر نشاطًا واحدًا على الأقل.';
+    return;
+  }
+  selectedActivities=checked;
+  localStorage.setItem(activityStorageKey(),JSON.stringify(selectedActivities));
+  applyActivityPreferences();
+  document.getElementById('settingsBackdrop').classList.remove('open');
+  render();
+});
+
+function renderCustomActivitySettings(){
+  const list=document.getElementById('customActivityList');
+  list.innerHTML=customActivities.length ? customActivities.map(activity=>`<div class="custom-activity-row"><span>${escapeHtml(activity.icon)} ${escapeHtml(activity.name)} <small>(${activity.type==='toggle'?'نعم / لا':activity.type==='number'?'رقم':'نص'})</small></span><button class="custom-activity-delete" type="button" data-custom-delete="${escapeHtml(activity.id)}">حذف</button></div>`).join('') : '<div class="note-msg">لم تضف أنشطة خاصة بعد.</div>';
+  list.querySelectorAll('[data-custom-delete]').forEach(button=>button.addEventListener('click',()=>{
+    const id=button.dataset.customDelete;
+    customActivities=customActivities.filter(activity=>activity.id!==id);
+    Object.keys(customActivityEntries).forEach(date=>{ if(customActivityEntries[date]) delete customActivityEntries[date][id]; });
+    saveCustomPreferences();
+    renderCustomActivitySettings();
+    renderCustomFields(monthData[dayKey(selectedDay)] || {});
+  }));
+}
+
+document.getElementById('addCustomActivityBtn').addEventListener('click',()=>{
+  const name=document.getElementById('customActivityName').value.trim();
+  const icon=document.getElementById('customActivityIcon').value.trim() || '✨';
+  const type=document.getElementById('customActivityType').value;
+  const msg=document.getElementById('settingsMsg');
+  if(!name){msg.textContent='اكتب اسم النشاط أولًا.';return;}
+  if(customActivities.some(activity=>activity.name===name)){msg.textContent='هذا النشاط موجود مسبقًا.';return;}
+  customActivities.push({id:`custom_${Date.now()}`,name,icon,type});
+  saveCustomPreferences();
+  document.getElementById('customActivityName').value='';
+  msg.textContent='تمت إضافة النشاط. احفظ الاختيارات لإظهاره.';
+  renderCustomActivitySettings();
+});
+
+document.getElementById('changeAvatarBtn').addEventListener('click',()=>{
+  document.getElementById('avatarInput').value='';
+  document.getElementById('avatarPreview').src=currentUser?.user_metadata?.avatar_url || DEFAULT_AVATAR;
+  document.getElementById('profileMsg').textContent='';
+  document.getElementById('profileBackdrop').classList.add('open');
+});
+document.getElementById('profileCloseBtn').addEventListener('click',()=>document.getElementById('profileBackdrop').classList.remove('open'));
+document.getElementById('avatarInput').addEventListener('change',event=>{
+  const file=event.target.files?.[0];
+  if(!file) return;
+  if(file.size>2*1024*1024){
+    document.getElementById('profileMsg').textContent='حجم الصورة يجب ألا يتجاوز 2 ميجابايت.';
+    event.target.value='';
+    return;
+  }
+  const reader=new FileReader();
+  reader.onload=()=>document.getElementById('avatarPreview').src=reader.result;
+  reader.readAsDataURL(file);
+});
+document.getElementById('profileSaveBtn').addEventListener('click',async()=>{
+  const file=document.getElementById('avatarInput').files?.[0];
+  if(!file){ document.getElementById('profileMsg').textContent='اختر صورة أولًا.'; return; }
+  const saveButton=document.getElementById('profileSaveBtn');
+  const msg=document.getElementById('profileMsg');
+  saveButton.disabled=true;
+  msg.textContent='جاري حفظ الصورة...';
+  const reader=new FileReader();
+  reader.onload=async()=>{
+    const image=new Image();
+    image.onload=async()=>{
+      const canvas=document.createElement('canvas');
+      const size=Math.min(640,Math.max(image.width,image.height));
+      const scale=size/Math.max(image.width,image.height);
+      canvas.width=Math.round(image.width*scale);
+      canvas.height=Math.round(image.height*scale);
+      canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);
+      const avatarUrl=canvas.toDataURL('image/jpeg',0.78);
+      const {data,error}=await _supabase.auth.updateUser({data:{avatar_url:avatarUrl}});
+      if(error){msg.textContent='تعذر حفظ الصورة. حاول مجددًا.';saveButton.disabled=false;return;}
+      currentUser=data.user;
+      applyUserProfile();
+      msg.textContent='تم تحديث الصورة.';
+      saveButton.disabled=false;
+      setTimeout(()=>document.getElementById('profileBackdrop').classList.remove('open'),500);
+    };
+    image.src=reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+async function loadAllEntries(){
+  if(!currentUser) return [];
+  const {data,error}=await _supabase.from('daily_entries').select('*').eq('user_id',currentUser.id).order('entry_date',{ascending:false});
+  if(error) throw error;
+  return (data || []).map(entry=>({...entry,customValues:customActivityEntries[entry.entry_date] || {}}));
+}
+
+function reportSummary(entry){
+  const values=[];
+  if(entry.prayers!==null && entry.prayers!==undefined) values.push(`🕌 ${entry.prayers}/3`);
+  if(entry.diet==='1') values.push('🥗 غذاء صحي');
+  if(entry.exercise==='1') values.push('🏃 رياضة');
+  if(entry.sleep!==null && entry.sleep!==undefined) values.push(`😴 ${entry.sleep}س`);
+  if(entry.water!==null && entry.water!==undefined) values.push(`💧 ${entry.water}`);
+  if(entry.weight!==null && entry.weight!==undefined) values.push(`⚖️ ${entry.weight} كغم`);
+  if(entry.rating!==null && entry.rating!==undefined) values.push(`⭐ ${entry.rating}/5`);
+  customActivities.forEach(activity=>{
+    const value=entry.customValues?.[activity.id];
+    if(value!==undefined && value!=='') values.push(`${activity.icon} ${activity.name}: ${value==='1'?'نعم':value==='0'?'لا':value}`);
+  });
+  return values.join(' · ') || 'لا توجد قيم مسجلة';
+}
+
+function renderReports(entries){
+  const list=document.getElementById('reportList');
+  list.innerHTML=entries.length ? entries.map((entry,index)=>`<div class="report-row"><div class="report-date">${escapeHtml(entry.entry_date)}</div><div class="report-values">${escapeHtml(reportSummary(entry))}</div><button class="report-edit" type="button" data-report-index="${index}">تعديل</button></div>`).join('') : '<div class="note-msg">لا توجد تقارير سابقة حتى الآن.</div>';
+  list.querySelectorAll('[data-report-index]').forEach(button=>button.addEventListener('click',()=>openReportedDay(entries[Number(button.dataset.reportIndex)])));
+}
+
+async function openReports(){
+  const msg=document.getElementById('reportsMsg');
+  msg.textContent='جاري تحميل التقارير...';
+  document.getElementById('reportsBackdrop').classList.add('open');
+  try{ const entries=await loadAllEntries(); renderReports(entries); msg.textContent=`تم العثور على ${entries.length} سجل`; }
+  catch(error){ msg.textContent='تعذر تحميل التقارير.'; }
+}
+
+async function openReportedDay(entry){
+  const [year,month,day]=entry.entry_date.split('-').map(Number);
+  viewYear=year; viewMonth=month-1;
+  document.getElementById('reportsBackdrop').classList.remove('open');
+  await loadMonth();
+  openDay(day);
+}
+
+function chartValues(entries,key){
+  return entries.filter(entry=>{
+    const value=key.startsWith('custom:') ? entry.customValues?.[key.slice(7)] : entry[key];
+    return value!==null && value!==undefined && value!=='' && !isNaN(Number(value));
+  }).slice(0,14).reverse();
+}
+
+function chartMarkup(title,entries,key,max,formatter){
+  const values=chartValues(entries,key);
+  if(!values.length) return `<div class="chart-box"><div class="chart-title">${title}</div><div class="note-msg">لا توجد بيانات كافية</div></div>`;
+  const bars=values.map(entry=>{
+    const raw=key.startsWith('custom:') ? entry.customValues?.[key.slice(7)] : entry[key];
+    const value=Number(raw);
+    const height=Math.max(3,Math.min(100,(value/max)*100));
+    return `<div class="chart-bar" style="height:${height}%"><span>${escapeHtml(formatter(value))}</span></div>`;
+  }).join('');
+  const labels=values.map(entry=>`<span>${escapeHtml(entry.entry_date.slice(5))}</span>`).join('');
+  return `<div class="chart-box"><div class="chart-title">${title}</div><div class="chart-bars">${bars}</div><div class="chart-labels">${labels}</div></div>`;
+}
+
+async function openCharts(){
+  const msg=document.getElementById('chartsMsg');
+  msg.textContent='جاري تجهيز الشارتات...';
+  document.getElementById('chartsBackdrop').classList.add('open');
+  try{
+    const entries=await loadAllEntries();
+    const charts=[
+      chartMarkup('ساعات النوم',entries,'sleep',16,value=>`${value}س`),
+      chartMarkup('أكواب الماء',entries,'water',20,value=>value),
+      chartMarkup('الرضا عن النفس',entries,'rating',5,value=>`${value}/5`),
+      chartMarkup('الوزن',entries,'weight',Math.max(1,...entries.map(entry=>Number(entry.weight)||0)),value=>`${value} كغم`)
+    ];
+    customActivities.filter(activity=>activity.type==='number').forEach(activity=>{
+      const max=Math.max(1,...entries.map(entry=>Number(entry.customValues?.[activity.id])||0));
+      charts.push(chartMarkup(`${activity.icon} ${activity.name}`,entries,`custom:${activity.id}`,max,value=>value));
+    });
+    document.getElementById('chartGrid').innerHTML=charts.join('');
+    msg.textContent='';
+  }catch(error){ msg.textContent='تعذر تحميل بيانات الشارتات.'; }
+}
+
+document.getElementById('reportsBtn').addEventListener('click',openReports);
+document.getElementById('reportsCloseBtn').addEventListener('click',()=>document.getElementById('reportsBackdrop').classList.remove('open'));
+document.getElementById('chartsBtn').addEventListener('click',openCharts);
+document.getElementById('chartsCloseBtn').addEventListener('click',()=>document.getElementById('chartsBackdrop').classList.remove('open'));
+
+// --- 4. جلب البيانات من Supabase ---
+async function loadMonth(){
+  monthData = {};
+  if (!currentUser) return;
+  const status = document.getElementById('statusMsg');
+  status.className = 'status-msg';
+  status.textContent = 'جاري تحميل الشهر...';
+
+  const startDate = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-01`;
+  const lastDay = new Date(viewYear, viewMonth+1, 0).getDate();
+  const endDate = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${lastDay}`;
+
+  let { data: sessionData } = await _supabase.auth.getSession();
+  if(!sessionData.session){
+    status.className = 'status-msg error';
+    status.textContent = 'انتهت جلسة الدخول. يرجى تسجيل الدخول مرة أخرى.';
+    document.getElementById('authBackdrop').classList.add('open');
+    return;
+  }
+
+  let query = () => _supabase
+    .from('daily_entries')
+    .select('entry_date,prayers,diet,exercise,satisfied,sleep,water,weight,rating,notes')
+    .eq('user_id', sessionData.session.user.id)
+    .gte('entry_date', startDate)
+    .lte('entry_date', endDate);
+  let { data, error } = await query();
+
+  if(error && (error.code === 'PGRST301' || error.status === 401 || error.status === 500 || error.status === 520)){
+    const refreshed = await _supabase.auth.refreshSession();
+    if(refreshed.data.session){
+      sessionData = refreshed.data;
+      currentUser = sessionData.session.user;
+      ({ data, error } = await query());
+    }
+  }
+
+  if(error) {
+    status.className = 'status-msg error';
+    status.textContent = error.code === 'PGRST116' || error.status === 401
+      ? 'انتهت جلسة الدخول. يرجى تسجيل الدخول مرة أخرى.'
+      : error.status === 520
+        ? 'خدمة البيانات في Supabase غير متاحة مؤقتًا. حاول بعد قليل.'
+        : 'تعذر تحميل البيانات من الخادم. حاول تحديث الصفحة بعد قليل.';
+    console.error('daily_entries load failed:', error);
+    render();
+    return;
+  }
+
+  if(data) {
+    data.forEach(item => {
+      const day = item.entry_date.split('-')[2];
+      monthData[day] = {
+        prayers: item.prayers,
+        diet: item.diet,
+        exercise: item.exercise,
+        satisfied: item.satisfied,
+        sleep: item.sleep,
+        water: item.water,
+        weight: item.weight,
+        rating: item.rating,
+        notes: item.notes
+      };
+    });
+  }
+  status.textContent = '';
+  render();
+}
+
+// --- 5. حفظ بيانات اليوم في Supabase ---
+async function saveMonth(day, entry){
+  if (currentUser) {
+    const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${dayKey(day)}`;
+    const payload = {
+      user_id: currentUser.id,
+      entry_date: dateStr,
+      prayers: entry.prayers,
+      diet: entry.diet,
+      exercise: entry.exercise,
+      satisfied: entry.satisfied,
+      sleep: entry.sleep !== '' ? parseFloat(entry.sleep) : null,
+      water: entry.water !== '' ? parseInt(entry.water, 10) : null,
+      weight: entry.weight !== '' ? parseFloat(entry.weight) : null,
+      rating: entry.rating !== '' ? parseInt(entry.rating, 10) : null,
+      notes: entry.notes
+    };
+
+    const { error } = await _supabase.from('daily_entries').upsert(payload, { onConflict: 'user_id, entry_date' });
+    if (error) throw error;
+  }
+  monthData[dayKey(day)] = entry;
+}
+
+function prevEntryWithWeight(day){
+  for(let d=day-1; d>=1; d--){
+    const e=monthData[dayKey(d)];
+    if(e && e.weight!==undefined && e.weight!==null && e.weight!=='') return e;
+  }
+  return null;
+}
+
+function computeAlerts(day, entry){
+  const alerts=[];
+  if(entry.sleep!==undefined && entry.sleep!==null && entry.sleep!==''){
+    const s=parseFloat(entry.sleep);
+    if(!isNaN(s)){
+      if(s<6) alerts.push('⚠️ نوم قليل هذا اليوم ('+s+' ساعة) — حاول تعوّض الليلة');
+      else if(s>9) alerts.push('⚠️ نوم زائد هذا اليوم ('+s+' ساعة)');
+    }
+  }
+  if(entry.weight!==undefined && entry.weight!==null && entry.weight!==''){
+    const w=parseFloat(entry.weight);
+    const prev=prevEntryWithWeight(day);
+    if(prev && !isNaN(w)){
+      const pw=parseFloat(prev.weight);
+      const diff=+(w-pw).toFixed(2);
+      if(diff>=0.5) alerts.push('📈 ارتفاع في الوزن بمقدار '+diff+' كغم منذ آخر تسجيل');
+      else if(diff<=-0.5) alerts.push('📉 انخفاض في الوزن بمقدار '+Math.abs(diff)+' كغم منذ آخر تسجيل');
+    }
+  }
+  return alerts;
+}
+
+function daysInMonth(y,m){ return new Date(y,m+1,0).getDate(); }
+function firstWeekday(y,m){ return new Date(y,m,1).getDay(); }
+function getDayStatus(day){
+  const date = new Date(viewYear, viewMonth, day);
+  date.setHours(0,0,0,0);
+  const current = new Date(today);
+  current.setHours(0,0,0,0);
+  if(date.getTime() < current.getTime()) return 'past';
+  if(date.getTime() > current.getTime()) return 'future';
+  return 'today';
+}
+
+function render(){
+  document.getElementById('monthLabel').textContent = ARABIC_MONTHS[viewMonth]+' '+viewYear;
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  const offset=firstWeekday(viewYear,viewMonth);
+  const total=daysInMonth(viewYear,viewMonth);
+  for(let i=0;i<offset;i++){
+    const c=document.createElement('div'); c.className='cell empty'; grid.appendChild(c);
+  }
+  for(let d=1; d<=total; d++){
+    const entry=monthData[dayKey(d)];
+    const c=document.createElement('div');
+    const dayStatus = getDayStatus(d);
+    c.className='cell'+(dayStatus==='today' ? ' today':'')+(dayStatus!=='today' ? ' locked':'')+(dayStatus==='future' ? ' future':'');
+    let iconsHtml='';
+    let deltaHtml='';
+    let alertCount=0;
+    if(entry){
+      if(entry.prayers!==undefined && entry.prayers!=='') iconsHtml+='🕌 '+entry.prayers+'/3'; 
+      if(entry.diet==='1') iconsHtml+='🥗';
+      if(entry.exercise==='1') iconsHtml+='🏃';
+      if(entry.satisfied==='1') iconsHtml+='😊';
+      const alerts=computeAlerts(d,entry);
+      alertCount=alerts.length;
+      const prev=prevEntryWithWeight(d);
+      if(entry.weight && prev){
+        const diff=+(parseFloat(entry.weight)-parseFloat(prev.weight)).toFixed(1);
+        if(diff!==0){
+          deltaHtml=`<div class="delta ${diff>0?'up':'down'}">${diff>0?'▲':'▼'} ${Math.abs(diff)}كغم</div>`;
+        }
+      }
+    }
+    c.innerHTML = `<div class="num">${d}</div><div class="icons">${iconsHtml}</div>${deltaHtml}`;
+    if(alertCount>0){
+      const b=document.createElement('div'); b.className='badge'; b.textContent='!'; c.appendChild(b);
+    }
+    if(dayStatus === 'past'){
+      c.setAttribute('aria-label','تعديل تقييم اليوم السابق');
+      c.addEventListener('click',()=>openDay(d));
+    } else if(dayStatus === 'today'){
+      c.setAttribute('aria-label','تقييم اليوم الحالي');
+      c.addEventListener('click',()=>openDay(d,false));
+    } else {
+      c.setAttribute('aria-label','يوم مستقبلي غير متاح للتقييم');
+    }
+    grid.appendChild(c);
+  }
+  renderStats();
+}
+
+function renderStats(){
+  const entries=Object.values(monthData);
+  const prayerVals=entries.filter(e=>e.prayers!=='' && e.prayers!==undefined && e.prayers!==null).map(e=>parseInt(e.prayers,10)).filter(v=>!isNaN(v));
+  const avgPrayer=prayerVals.length ? (prayerVals.reduce((a,b)=>a+b,0)/prayerVals.length).toFixed(1) : '—';
+  const sleepVals=entries.filter(e=>e.sleep!=='' && e.sleep!==undefined && e.sleep!==null).map(e=>parseFloat(e.sleep)).filter(v=>!isNaN(v));
+  const avgSleep=sleepVals.length ? (sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length).toFixed(1) : '—';
+  const weightVals=Object.keys(monthData).sort((a,b)=>Number(a)-Number(b)).filter(k=>monthData[k].weight!=='' && monthData[k].weight!==undefined && monthData[k].weight!==null).map(k=>parseFloat(monthData[k].weight)).filter(v=>!isNaN(v));
+  let weightChange='—';
+  if(weightVals.length>=2){
+    const diff=+(weightVals[weightVals.length-1]-weightVals[0]).toFixed(1);
+    weightChange=(diff>0?'+':'')+diff+' كغم';
+  }
+  const ratingVals=entries.filter(e=>e.rating).map(e=>parseInt(e.rating));
+  const avgRating=ratingVals.length ? (ratingVals.reduce((a,b)=>a+b,0)/ratingVals.length).toFixed(1) : '—';
+
+  const stats=[
+    {key:'prayers',icon:'🕌',val:avgPrayer+'/3',lbl:'متوسط الصلاة'},
+    {key:'sleep',icon:'😴',val:avgSleep,lbl:'متوسط النوم (ساعة)'},
+    {key:'weight',icon:'⚖️',val:weightChange,lbl:'تغيّر الوزن هذا الشهر'},
+    {key:'rating',icon:'⭐',val:avgRating,lbl:'متوسط الرضا عن النفس'}
+  ];
+  document.getElementById('stats').innerHTML = stats.map(s=>
+    selectedActivities.includes(s.key) ? `<div class="stat"><div class="icon">${s.icon}</div><div class="val">${s.val}</div><div class="lbl">${s.lbl}</div></div>` : ''
+  ).join('');
+}
+
+function openDay(d){
+  const dayStatus = getDayStatus(d);
+  if(dayStatus === 'future') return;
+  selectedDay=d;
+  const modal = document.querySelector('#backdrop .modal');
+  modal.classList.remove('read-only');
+  modal.querySelector('.sub').textContent = dayStatus === 'past' ? 'يمكنك تعديل نتيجة هذا اليوم وحفظها من جديد' : 'سجّل يومك بصدق، بدون ضغط 🌿';
+  document.getElementById('saveBtn').hidden = false;
+  const entry=monthData[dayKey(d)] || {prayers:'',diet:'',exercise:'',satisfied:'',sleep:'',water:'',weight:'',rating:'',notes:''};
+  document.getElementById('modalDate').textContent = d+' '+ARABIC_MONTHS[viewMonth]+' '+viewYear;
+  document.querySelectorAll('.toggle').forEach(t=>{
+    const key=t.dataset.key;
+    t.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('active', String(entry[key])===b.dataset.v);
+      b.disabled = false;
+    });
+  });
+  const prayerRating=document.querySelector('.prayer-rating');
+  prayerRating.querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('active', String(entry.prayers)===b.dataset.v);
+    b.disabled=false;
+  });
+  document.getElementById('sleepInput').value=entry.sleep ?? '';
+  document.getElementById('waterInput').value=entry.water ?? '';
+  document.getElementById('weightInput').value=entry.weight ?? '';
+  document.getElementById('notesInput').value=entry.notes ?? '';
+  document.getElementById('sleepInput').disabled=false;
+  document.getElementById('waterInput').disabled=false;
+  document.getElementById('weightInput').disabled=false;
+  document.getElementById('notesInput').disabled=false;
+  renderCustomFields(entry);
+  renderRating(entry.rating||'');
+  const alerts=computeAlerts(d,entry);
+  document.getElementById('alertsArea').innerHTML = alerts.map(a=>`<div class="alertbox">${a}</div>`).join('');
+  document.getElementById('saveMsg').textContent='';
+  document.getElementById('backdrop').classList.add('open');
+}
+
+function renderRating(current){
+  const area=document.getElementById('ratingArea');
+  area.innerHTML='';
+  for(let i=1;i<=5;i++){
+    const b=document.createElement('button');
+    b.textContent=i;
+    b.dataset.v=i;
+    b.disabled=false;
+    if(String(current)===String(i)) b.classList.add('active');
+    b.addEventListener('click',()=>{
+      area.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+    area.appendChild(b);
+  }
+}
+
+document.querySelectorAll('.prayer-rating button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
+
+document.querySelectorAll('.toggle').forEach(t=>{
+  t.querySelectorAll('button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      t.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+});
+
+document.getElementById('closeBtn').addEventListener('click',()=>{
+  document.getElementById('backdrop').classList.remove('open');
+});
+
+document.getElementById('saveBtn').addEventListener('click', async ()=>{
+  if(selectedDay === null || getDayStatus(selectedDay) === 'future') return;
+  const previous=monthData[dayKey(selectedDay)] || {};
+  const entry={...previous};
+  document.querySelectorAll('.toggle').forEach(t=>{
+    if(selectedActivities.includes(t.dataset.key)){
+      const active=t.querySelector('button.active');
+      entry[t.dataset.key]=active?active.dataset.v:'';
+    }
+  });
+  if(selectedActivities.includes('prayers')){
+    const activePrayer=document.querySelector('.prayer-rating button.active');
+    entry.prayers=activePrayer?activePrayer.dataset.v:'';
+  }
+  ['sleep','water','weight'].forEach(key=>{
+    if(selectedActivities.includes(key)) entry[key]=document.getElementById(key+'Input').value;
+  });
+  if(selectedActivities.includes('rating')){
+    const activeRating=document.querySelector('#ratingArea button.active');
+    entry.rating=activeRating?activeRating.dataset.v:'';
+  }
+  if(selectedActivities.includes('notes')) entry.notes=document.getElementById('notesInput').value;
+
+  const saveButton = document.getElementById('saveBtn');
+  saveButton.disabled = true;
+  document.getElementById('saveMsg').textContent = 'جاري الحفظ...';
+  try {
+    await saveMonth(selectedDay, entry);
+  } catch (error) {
+    document.getElementById('saveMsg').textContent = '❌ تعذر الحفظ. تحقق من الاتصال وحاول مجددًا.';
+    saveButton.disabled = false;
+    return;
+  }
+  customActivityEntries[currentDateKey(selectedDay)]=collectCustomValues();
+  saveCustomPreferences();
+  const alerts=computeAlerts(selectedDay,entry);
+  document.getElementById('alertsArea').innerHTML = alerts.map(a=>`<div class="alertbox">${a}</div>`).join('');
+  document.getElementById('saveMsg').textContent = '✅ تم الحفظ بنجاح';
+  saveButton.disabled = false;
+  render();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  await _supabase.auth.signOut();
+  currentUser = null;
+  monthData = {};
+  document.getElementById('authBackdrop').classList.add('open');
+});
+
+document.getElementById('prevBtn').addEventListener('click',()=>{
+  viewMonth--; if(viewMonth<0){viewMonth=11; viewYear--;}
+  loadMonth();
+});
+document.getElementById('nextBtn').addEventListener('click',()=>{
+  viewMonth++; if(viewMonth>11){viewMonth=0; viewYear++;}
+  loadMonth();
+});
+
+// بدء التحقق فور فتح التطبيق
+checkAuthStatus();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('PWA Service Worker Registered'))
+      .catch((err) => console.log('SW registration failed: ', err));
+  });
+}
+</script>
+</body>
+</html>
